@@ -1,6 +1,7 @@
 import os
 import sys
 import pandas as pd
+import numpy as np
 from sqlalchemy.orm import Session
 from sqlalchemy.dialects.postgresql import insert
 from tqdm import tqdm
@@ -24,6 +25,11 @@ warning_logger = logging.getLogger("dedup_warnings")
 warning_handler = logging.FileHandler("backend/scripts/logs/dedup_warnings.log")
 warning_logger.addHandler(warning_handler)
 
+def is_actually_na(val):
+    if isinstance(val, (list, np.ndarray)):
+        return False
+    return pd.isna(val)
+
 def import_dataframe(df: pd.DataFrame, dry_run: bool = False):
     if df.empty:
         print("No data to import.")
@@ -40,7 +46,7 @@ def import_dataframe(df: pd.DataFrame, dry_run: bool = False):
 
         for record in tqdm(records, desc="Importing to DB"):
             # Clean record: remove NaNs, replace with None
-            record = {k: (None if pd.isna(v) else v) for k, v in record.items()}
+            record = {k: (None if is_actually_na(v) else v) for k, v in record.items()}
 
             # Compute score and tier
             score, _ = compute_score(record)
@@ -86,9 +92,13 @@ def import_dataframe(df: pd.DataFrame, dry_run: bool = False):
                 try:
                     result = db.execute(stmt)
                     row = result.fetchone()
-                    if row.is_new:
-                        new_count += 1
+                    if row and hasattr(row, 'is_new'):
+                        if row.is_new:
+                            new_count += 1
+                        else:
+                            updated_count += 1
                     else:
+                        # Fallback if returning doesn't work as expected in this setup
                         updated_count += 1
                 except Exception as e:
                     logging.error(f"Error upserting record: {e}")

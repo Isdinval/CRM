@@ -9,25 +9,27 @@ def scrape():
     print("Starting Santé directories scrape (Source 7)...")
     results = []
 
-    # 7a. SantéNavigator
-    try:
-        res = requests.get("https://www.sante.fr/orthodontiste", timeout=10)
-        soup = BeautifulSoup(res.text, 'lxml')
-        # ... logic to parse static HTML ...
-    except Exception as e:
-        print(f"Error on SantéNavigator: {e}")
+    cities = ["paris", "marseille", "lyon"]
+    for city in cities:
+        try:
+            url = f"https://www.sante.fr/recherche/annuaire/orthodontiste/{city}"
+            res = requests.get(url, timeout=10, headers={"User-Agent": "Mozilla/5.0"})
+            soup = BeautifulSoup(res.text, 'lxml')
 
-    # 7b. Medoucine
-    try:
-        res = requests.get("https://www.medoucine.com/orthodontiste", timeout=10)
-        soup = BeautifulSoup(res.text, 'lxml')
-        # ... logic to parse static HTML ...
-    except Exception as e:
-        print(f"Error on Medoucine: {e}")
+            # Simple parsing attempt
+            for item in soup.select('.result-item'):
+                name = item.select_one('.title').text.strip() if item.select_one('.title') else ""
+                results.append({
+                    'last_name': name,
+                    'city': city.capitalize(),
+                    'source': 'sante_dirs'
+                })
+        except Exception as e:
+            print(f"Error on SantéNavigator for {city}: {e}")
 
     df = pd.DataFrame(results)
-    df['source'] = 'sante_dirs'
     df.to_csv(OUTPUT_FILE, index=False)
+    print(f"Santé directories scrape complete: {len(results)} rows.")
     return df
 
 if __name__ == "__main__":

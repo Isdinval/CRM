@@ -24,31 +24,37 @@ def fetch():
 
     for city in CITIES:
         print(f"Fetching Google Maps for {city}...")
-        params = {
-            "engine": "google_maps",
-            "q": f"orthodontiste {city}",
-            "api_key": SERPAPI_KEY,
-            "hl": "fr",
-            "gl": "fr"
-        }
-
-        try:
-            response = requests.get("https://serpapi.com/search.json", params=params)
-            data = response.json()
-
-            for place in data.get("local_results", []):
-                results.append({
-                    'practice_name': place.get('title'),
-                    'address': place.get('address'),
-                    'phone': place.get('phone'),
-                    'website_url': place.get('website'),
-                    'google_reviews_count': place.get('reviews'),
-                    'google_reviews_avg': place.get('rating'),
-                    'city': city,
-                    'source': 'googlemaps'
-                })
-        except Exception as e:
-            print(f"Error fetching Google Maps for {city}: {e}")
+        for start in [0, 20]: # Get 2 pages
+            params = {
+                "engine": "google_maps",
+                "q": f"orthodontiste {city}",
+                "api_key": SERPAPI_KEY,
+                "hl": "fr",
+                "gl": "fr",
+                "start": start
+            }
+            try:
+                response = requests.get("https://serpapi.com/search.json", params=params)
+                data = response.json()
+                local_results = data.get("local_results", [])
+                if not local_results:
+                    break
+                for place in local_results:
+                    results.append({
+                        'practice_name': place.get('title'),
+                        'address': place.get('address'),
+                        'phone': place.get('phone'),
+                        'website_url': place.get('website'),
+                        'google_reviews_count': place.get('reviews'),
+                        'google_reviews_avg': place.get('rating'),
+                        'city': city,
+                        'source': 'googlemaps'
+                    })
+                if len(local_results) < 20:
+                    break
+            except Exception as e:
+                print(f"Error fetching Google Maps for {city} at start {start}: {e}")
+                break
 
     df = pd.DataFrame(results)
     df.to_csv(OUTPUT_FILE, index=False)
